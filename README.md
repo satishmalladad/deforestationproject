@@ -1,2 +1,15 @@
-# deforestationproject
-Deforestation monitoring platform for India that visualizes forest loss trends, biodiversity risk, and affected areas using interactive maps and charts. It helps track regional changes over time and supports conservation planning and environmental awareness.
+# Deforestation Project 🌳
+
+## Overview
+This project analyzes deforestation patterns and trends using data from various sources. It aims to provide insights into forest loss, its causes, and potential solutions to mitigate environmental impact.
+
+## Features
+- Analyze deforestation data over time
+- Visualize forest loss trends with graphs and charts
+- Identify regions with high deforestation rates
+- Support for multiple datasets
+
+## Installation
+1. Clone the repository:
+   ```bash
+   git clone https://github.com/satishmalladad/deforestationproject.git
