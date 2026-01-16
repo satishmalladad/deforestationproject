@@ -1,0 +1,459 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ForestGuard India - AI Deforestation Tracker</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/echarts/5.5.0/echarts.min.js"></script>
+    <style>
+        body {
+            font-family: 'Roboto', 'Segoe UI', sans-serif;
+            margin: 0;
+            padding: 40px;
+            background: linear-gradient(135deg, #e6f0ea 0%, #b8d8c8 100%);
+            color: #1a3c34;
+            line-height: 1.6;
+        }
+        .dashboard {
+            max-width: 1400px;
+            margin: 0 auto;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 30px;
+        }
+        .card {
+            background: rgba(255, 255, 255, 0.9);
+            padding: 30px;
+            border-radius: 16px;
+            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.1);
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+            backdrop-filter: blur(5px);
+        }
+        .card:hover {
+            transform: translateY(-8px);
+            box-shadow: 0 12px 35px rgba(0, 0, 0, 0.15);
+        }
+        h2 {
+            color: #1a3c34;
+            margin-bottom: 25px;
+            font-size: 2em;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+        #map {
+            height: 480px;
+            width: 100%;
+            border-radius: 12px;
+            border: 3px solid #73b9a2;
+            box-shadow: 0 4px 15px rgba(90, 153, 129, 0.2);
+        }
+        .controls {
+            margin-bottom: 30px;
+            display: flex;
+            gap: 20px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+        select, input[type="range"] {
+            padding: 12px 20px;
+            border: 2px solid #8abca3;
+            border-radius: 10px;
+            background: linear-gradient(45deg, #f7faf8, #e8f0ec);
+            color: #2d4a3e;
+            font-size: 1.1em;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        select:hover, select:focus, input[type="range"]:hover, input[type="range"]:focus {
+            border-color: #5a9981;
+            background: #fff;
+            box-shadow: 0 0 10px rgba(90, 153, 129, 0.3);
+            outline: none;
+        }
+        button {
+            padding: 14px 30px;
+            background: linear-gradient(45deg, #5a9981, #8abca3);
+            color: white;
+            border: none;
+            border-radius: 10px;
+            font-size: 1.1em;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 15px rgba(90, 153, 129, 0.4);
+        }
+        button:hover {
+            transform: scale(1.06);
+            background: linear-gradient(45deg, #4a7d68, #73b9a2);
+            box-shadow: 0 6px 20px rgba(90, 153, 129, 0.6);
+        }
+        button:active {
+            transform: scale(0.98);
+            box-shadow: 0 2px 10px rgba(90, 153, 129, 0.3);
+        }
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 25px;
+            margin-bottom: 30px;
+        }
+        .stats div {
+            background: linear-gradient(135deg, #f7faf8, #e8f0ec);
+            padding: 20px;
+            border-radius: 12px;
+            transition: all 0.3s ease;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+        }
+        .stats div:hover {
+            background: #e0ebe6;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+        }
+        h3 {
+            color: #3a6657;
+            margin-bottom: 12px;
+            font-size: 1.4em;
+            font-weight: 600;
+        }
+        p {
+            margin: 0;
+            font-size: 1.2em;
+            color: #2d4a3e;
+            font-weight: 500;
+        }
+        #change-detection, #biodiversity-chart, #recommendations, #insights {
+            background: linear-gradient(135deg, #f7faf8, #e8f0ec);
+            padding: 25px;
+            border-radius: 12px;
+            transition: all 0.3s ease;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+        }
+        #change-detection:hover, #biodiversity-chart:hover, #recommendations:hover, #insights:hover {
+            background: #e0ebe6;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+        }
+        #forest-loss-chart, #biodiversity-risk-chart {
+            height: 280px;
+            width: 100%;
+            border-radius: 8px;
+            border: 1px solid #8abca3;
+        }
+        ul {
+            list-style-type: disc;
+            padding-left: 25px;
+            color: #2d4a3e;
+        }
+        li {
+            margin: 10px 0;
+            font-size: 1.1em;
+        }
+        .time-lapse {
+            margin-top: 20px;
+            font-weight: 500;
+        }
+        .loading-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.6);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+        }
+        .loader {
+            border: 6px solid #f3f3f3;
+            border-top: 6px solid #5a9981;
+            border-radius: 50%;
+            width: 60px;
+            height: 60px;
+            animation: spin 1s ease-in-out infinite, pulse 1.5s infinite;
+        }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        @keyframes pulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.1); } }
+        .problem-statement {
+            background: #d9e8e1;
+            padding: 20px;
+            border-radius: 12px;
+            margin-bottom: 25px;
+            font-size: 1em;
+            border-left: 5px solid #5a9981;
+        }
+        #forest-image-container {
+            margin-top: 25px;
+            text-align: center;
+        }
+        #forest-image {
+            max-width: 100%;
+            height: 220px;
+            border-radius: 12px;
+            border: 3px solid transparent;
+            background: linear-gradient(45deg, #5a9981, #8abca3) border-box;
+            object-fit: cover;
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+        #forest-image:hover {
+            transform: scale(1.03);
+            box-shadow: 0 6px 20px rgba(90, 153, 129, 0.4);
+        }
+        #forest-image-caption {
+            margin-top: 15px;
+            font-size: 1.1em;
+            color: #3a6657;
+            font-weight: 500;
+            text-transform: uppercase;
+        }
+    </style>
+</head>
+<body>
+    <div class="dashboard">
+        <div class="card">
+            <h2>ForestGuard India - AI Tracker</h2>
+            <div class="problem-statement">
+                <strong>Problem:</strong> India lost 2.33M ha of tree cover from 2001-2023 (GFW). Our AI tracks deforestation and biodiversity risk using satellite imagery.
+            </div>
+            <div class="controls">
+                <select id="region">
+                    <option value="western-ghats">Western Ghats</option>
+                    <option value="sundarbans">Sundarbans</option>
+                    <option value="himalayan">Himalayan Forests</option>
+                    <option value="central-india">Central Indian Forests</option>
+                    <option value="northeast">Northeast Forests</option>
+                    <option value="eastern-ghats">Eastern Ghats</option>
+                    <option value="andaman-nicobar">Andaman & Nicobar Forests</option>
+                    <option value="aravalli">Aravalli Range</option>
+                    <option value="satpura">Satpura Range</option>
+                    <option value="vindhya">Vindhya Range</option>
+                    <option value="chhota-nagpur">Chhota Nagpur Plateau</option>
+                </select>
+                <button onclick="analyzeArea()">Run  Detection</button>
+                <div class="time-lapse">
+                    <label for="timeRange">Time Lapse (Months):</label>
+                    <input type="range" id="timeRange" min="1" max="24" value="12" oninput="updateTimeLapse(this.value)">
+                    <span id="timeValue">12</span>
+                </div>
+            </div>
+            <div id="map"></div>
+            <div id="forest-image-container">
+                <img id="forest-image" src="https://via.placeholder.com/400x200?text=Select+a+Region" alt="Forest Image">
+                <p id="forest-image-caption">Select a region to view its forest</p>
+            </div>
+        </div>
+        <div class="card">
+            <h2>AI-Driven Insights</h2>
+            <div class="stats">
+                <div><h3>Deforestation Rate</h3><p id="deforestation-rate">0%</p></div>
+                <div><h3>Biodiversity Risk</h3><p id="biodiversity-risk">Low</p></div>
+                <div><h3>Affected Area</h3><p id="affected-area">0 ha</p></div>
+                <div><h3>Species at Risk</h3><p id="species-risk">0</p></div>
+            </div>
+            <div id="change-detection"><h3>AI-Detected Forest Loss Trend</h3><div id="forest-loss-chart"></div></div>
+            <div id="biodiversity-chart"><h3>Biodiversity Risk Distribution</h3><div id="biodiversity-risk-chart"></div></div>
+            <div id="recommendations"><h3>Actionable Recommendations</h3><p>Select a region to run AI detection</p></div>
+            <div id="insights"><h3>Insights & Predictions</h3><p>Select a region to view insights</p></div>
+        </div>
+    </div>
+    <div class="loading-overlay" id="loadingOverlay">
+        <div class="loader"></div><p style="color: white; margin-left: 20px; font-size: 1.2em;">AI Analyzing Satellite Imagery...</p>
+    </div>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script>
+        const map = L.map('map').setView([20.5937, 78.9629], 5);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+        }).addTo(map);
+
+        const regions = {
+            'western-ghats': [10.1693, 77.0615], 'sundarbans': [21.9497, 88.8973], 'himalayan': [30.3753, 79.0800],
+            'central-india': [21.1458, 79.0882], 'northeast': [26.2006, 92.9376], 'eastern-ghats': [17.6868, 83.2185],
+            'andaman-nicobar': [11.7401, 92.6586], 'aravalli': [25.3176, 75.7139], 'satpura': [22.4667, 77.9337],
+            'vindhya': [24.5319, 80.8311], 'chhota-nagpur': [23.3441, 85.3096]
+        };
+
+        const forestLossData = {
+            'western-ghats': [40, 45, 60, 55, 70, 80, 90, 100, 85, 95, 110, 120, 130, 125, 140, 150, 145, 160, 170, 165, 180, 190, 200, 195],
+            'sundarbans': [15, 20, 25, 30, 35, 30, 25, 20, 25, 30, 35, 40, 45, 40, 35, 30, 35, 40, 45, 50, 45, 40, 35, 30],
+            'himalayan': [50, 60, 70, 80, 90, 100, 110, 120, 130, 140, 150, 160, 150, 140, 130, 120, 110, 100, 90, 80, 70, 60, 50, 40],
+            'central-india': [45, 50, 55, 60, 65, 70, 75, 80, 85, 90, 95, 100, 105, 110, 115, 120, 125, 130, 135, 140, 145, 150, 155, 160],
+            'northeast': [80, 90, 100, 120, 140, 160, 180, 200, 220, 240, 260, 280, 300, 280, 260, 240, 220, 200, 180, 160, 140, 120, 100, 80],
+            'eastern-ghats': [30, 35, 40, 45, 50, 55, 60, 65, 70, 75, 80, 85, 90, 95, 100, 105, 110, 115, 120, 125, 130, 135, 140, 145],
+            'andaman-nicobar': [10, 15, 20, 25, 20, 15, 10, 15, 20, 25, 30, 35, 30, 25, 20, 15, 20, 25, 30, 35, 30, 25, 20, 15],
+            'aravalli': [20, 25, 30, 35, 40, 45, 50, 55, 60, 65, 70, 75, 70, 65, 60, 55, 50, 45, 40, 35, 30, 25, 20, 15],
+            'satpura': [40, 45, 50, 55, 60, 65, 70, 75, 80, 85, 90, 95, 100, 105, 110, 115, 120, 125, 130, 135, 140, 145, 150, 155],
+            'vindhya': [35, 40, 45, 50, 55, 60, 65, 70, 75, 80, 85, 90, 95, 100, 105, 110, 115, 120, 125, 130, 135, 140, 145, 150],
+            'chhota-nagpur': [50, 55, 60, 65, 70, 75, 80, 85, 90, 95, 100, 105, 110, 115, 120, 125, 130, 135, 140, 145, 150, 155, 160, 165]
+        };
+
+        const biodiversityRiskData = {
+            'western-ghats': { 'High': 60, 'Medium': 25, 'Low': 15 }, 'sundarbans': { 'High': 20, 'Medium': 50, 'Low': 30 },
+            'himalayan': { 'High': 55, 'Medium': 30, 'Low': 15 }, 'central-india': { 'High': 30, 'Medium': 45, 'Low': 25 },
+            'northeast': { 'High': 65, 'Medium': 20, 'Low': 15 }, 'eastern-ghats': { 'High': 40, 'Medium': 35, 'Low': 25 },
+            'andaman-nicobar': { 'High': 25, 'Medium': 45, 'Low': 30 }, 'aravalli': { 'High': 35, 'Medium': 40, 'Low': 25 },
+            'satpura': { 'High': 45, 'Medium': 35, 'Low': 20 }, 'vindhya': { 'High': 30, 'Medium': 45, 'Low': 25 },
+            'chhota-nagpur': { 'High': 50, 'Medium': 30, 'Low': 20 }
+        };
+
+        const totalForestArea = {
+            'western-ghats': 3200, 'sundarbans': 750, 'himalayan': 2800, 'central-india': 2700, 'northeast': 3500,
+            'eastern-ghats': 2000, 'andaman-nicobar': 800, 'aravalli': 1200, 'satpura': 2500, 'vindhya': 1800,
+            'chhota-nagpur': 3000
+        };
+
+        const forestImages = {
+            'western-ghats': 'https://images.unsplash.com/photo-1542202224-5d1d7f5b13b8?ixlib=rb-4.0.3&auto=format&fit=crop&w=400&q=60',
+            'sundarbans': 'https://images.unsplash.com/photo-1597176655578-6c8602663369?ixlib=rb-4.0.3&auto=format&fit=crop&w=400&q=60',
+            'himalayan': 'https://images.unsplash.com/photo-1544198368-029eb5e8e89d?ixlib=rb-4.0.3&auto=format&fit=crop&w=400&q=60',
+            'central-india': 'https://images.unsplash.com/photo-1600585154340-be6161a56a0c?ixlib=rb-4.0.3&auto=format&fit=crop&w=400&q=60',
+            'northeast': 'https://images.unsplash.com/photo-1597404294360-feeeda0a50d5?ixlib=rb-4.0.3&auto=format&fit=crop&w=400&q=60',
+            'eastern-ghats': 'https://images.unsplash.com/photo-1593696140826-73e8e048fb65?ixlib=rb-4.0.3&auto=format&fit=crop&w=400&q=60',
+            'andaman-nicobar': 'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?ixlib=rb-4.0.3&auto=format&fit=crop&w=400&q=60',
+            'aravalli': 'https://images.unsplash.com/photo-1600585154340-be6161a56a0c?ixlib=rb-4.0.3&auto=format&fit=crop&w=400&q=60',
+            'satpura': 'https://images.unsplash.com/photo-1563372522-68f04e257263?ixlib=rb-4.0.3&auto=format&fit=crop&w=400&q=60',
+            'vindhya': 'https://images.unsplash.com/photo-1593696140826-73e8e048fb65?ixlib=rb-4.0.3&auto=format&fit=crop&w=400&q=60',
+            'chhota-nagpur': 'https://images.unsplash.com/photo-1597404294360-feeeda0a50d5?ixlib=rb-4.0.3&auto=format&fit=crop&w=400&q=60'
+        };
+
+        const markers = {};
+        for (const [region, coords] of Object.entries(regions)) {
+            markers[region] = L.marker(coords, {
+                icon: L.divIcon({ className: 'custom-marker', html: '<div style="background: #5a9981; width: 14px; height: 14px; border-radius: 50%; border: 3px solid white;"></div>', iconSize: [14, 14] })
+            }).addTo(map).bindPopup(`<b>${region.replace(/-/g, ' ').toUpperCase()}</b><br>AI Analysis Pending`, { className: 'custom-popup', offset: [0, -10] });
+        }
+
+        document.head.appendChild(document.createElement('style')).innerHTML = `
+            .custom-popup .leaflet-popup-content-wrapper { background: #f7faf8; color: #2d4a3e; border-radius: 8px; box-shadow: 0 3px 15px rgba(0,0,0,0.2); padding: 10px; }
+            .custom-popup .leaflet-popup-tip { background: #f7faf8; }
+        `;
+
+        const forestLossChart = echarts.init(document.getElementById('forest-loss-chart'));
+        const biodiversityRiskChart = echarts.init(document.getElementById('biodiversity-risk-chart'));
+
+        forestLossChart.setOption({ 
+            xAxis: { type: 'category', data: ['No Data'], axisLine: { lineStyle: { color: '#5a9981' } } }, 
+            yAxis: { type: 'value', name: 'Hectares Lost', axisLine: { lineStyle: { color: '#5a9981' } } }, 
+            series: [{ data: [0], type: 'line', color: '#5a9981' }], 
+            tooltip: { trigger: 'axis', backgroundColor: '#f7faf8', textStyle: { color: '#2d4a3e' } } 
+        });
+        biodiversityRiskChart.setOption({ 
+            series: [{ type: 'pie', radius: '55%', data: [{ value: 100, name: 'No Data' }], label: { show: false }, color: ['#d9e8e1'] }], 
+            tooltip: { trigger: 'item', backgroundColor: '#f7faf8', textStyle: { color: '#2d4a3e' } } 
+        });
+
+        function aiDetectDeforestation(region, months) {
+            const lossTrend = forestLossData[region].slice(0, months);
+            const totalLoss = lossTrend.reduce((a, b) => a + b, 0);
+            const deforestationRate = Math.min((totalLoss / totalForestArea[region] * 100).toFixed(1), 100) + '%';
+            let biodiversityRisk, speciesRisk;
+
+            const riskScore = totalLoss / totalForestArea[region] * 100 + Math.random() * 5;
+            if (riskScore > 15) biodiversityRisk = 'High';
+            else if (riskScore > 5) biodiversityRisk = 'Medium';
+            else biodiversityRisk = 'Low';
+
+            speciesRisk = Math.round(totalLoss / (region === 'sundarbans' || region === 'andaman-nicobar' ? 15 : 10)) + 
+                          (region === 'western-ghats' ? 130 : region === 'himalayan' ? 160 : region === 'central-india' ? 120 : 
+                           region === 'northeast' ? 200 : region === 'eastern-ghats' ? 100 : region === 'andaman-nicobar' ? 80 : 
+                           region === 'aravalli' ? 70 : region === 'satpura' ? 140 : region === 'vindhya' ? 90 : region === 'chhota-nagpur' ? 150 : 70);
+
+            return { deforestationRate, biodiversityRisk, affectedArea: totalLoss, speciesRisk, lossTrend };
+        }
+
+        function updateForestImage(region) {
+            document.getElementById('forest-image').src = forestImages[region];
+            document.getElementById('forest-image-caption').textContent = `${region.replace(/-/g, ' ').toUpperCase()} FOREST`;
+        }
+
+        function analyzeArea() {
+            const loadingOverlay = document.getElementById('loadingOverlay');
+            loadingOverlay.style.display = 'flex';
+            setTimeout(() => {
+                const region = document.getElementById('region').value;
+                const months = parseInt(document.getElementById('timeRange').value);
+                const aiResult = aiDetectDeforestation(region, months);
+
+                const elements = ['deforestation-rate', 'biodiversity-risk', 'affected-area', 'species-risk'];
+                elements.forEach(id => { const el = document.getElementById(id); el.style.opacity = '0'; el.style.transition = 'opacity 0.4s ease'; });
+                setTimeout(() => {
+                    document.getElementById('deforestation-rate').textContent = aiResult.deforestationRate;
+                    document.getElementById('biodiversity-risk').textContent = aiResult.biodiversityRisk;
+                    document.getElementById('affected-area').textContent = `${aiResult.affectedArea} ha`;
+                    document.getElementById('species-risk').textContent = aiResult.speciesRisk;
+                    elements.forEach(id => document.getElementById(id).style.opacity = '1');
+                }, 300);
+
+                forestLossChart.setOption({
+                    xAxis: { data: Array.from({ length: months }, (_, i) => `Month ${i + 1}`) },
+                    yAxis: { name: 'Hectares Lost' },
+                    series: [{ data: aiResult.lossTrend, type: 'line', smooth: true, color: '#5a9981', areaStyle: { color: 'rgba(90, 153, 129, 0.3)' } }]
+                });
+
+                const riskDist = biodiversityRiskData[region];
+                biodiversityRiskChart.setOption({
+                    series: [{
+                        data: [{ value: riskDist['High'], name: 'High Risk' }, { value: riskDist['Medium'], name: 'Medium Risk' }, { value: riskDist['Low'], name: 'Low Risk' }],
+                        type: 'pie', radius: '55%', label: { show: true, formatter: '{b}: {d}%', color: '#2d4a3e' }, color: ['#d9534f', '#f0ad4e', '#5cb85c']
+                    }]
+                });
+
+                let recommendations = '<h3>Actionable Recommendations</h3><ul><li>Enforce anti-encroachment laws</li><li>Implement sustainable mining policies</li><li>Promote urban green corridors</li>';
+                switch (region) {
+                    case 'western-ghats': recommendations += '<li>Protect biodiversity hotspots with patrols</li><li>Regulate plantations sustainably</li><li>Reforest 3,000 ha by 2030</li>'; break;
+                    case 'sundarbans': recommendations += '<li>Preserve mangroves with coastal barriers</li><li>Control erosion via embankments</li><li>Monitor cyclones</li>'; break;
+                    case 'himalayan': recommendations += '<li>Stop illegal logging with drones</li><li>Safeguard alpine habitats</li><li>Plant 2,500 ha of pines</li>'; break;
+                    case 'central-india': recommendations += '<li>Empower tribal rights legally</li><li>Limit mining with quotas</li><li>Enhance forest corridors</li>'; break;
+                    case 'northeast': recommendations += '<li>Combat logging with AI surveillance</li><li>Promote sustainable jhum cultivation</li><li>Reforest 5,000 ha by 2030</li>'; break;
+                    case 'eastern-ghats': recommendations += '<li>Regulate mining strictly</li><li>Launch reforestation drives</li><li>Restore 2,000 ha</li>'; break;
+                    case 'andaman-nicobar': recommendations += '<li>Preserve rainforests via tourism caps</li><li>Monitor coastal impacts</li><li>Plant 1,000 ha</li>'; break;
+                    case 'aravalli': recommendations += '<li>Restore degraded forests with natives</li><li>Restrict mining permits</li><li>Reforest 1,500 ha</li>'; break;
+                    case 'satpura': recommendations += '<li>Protect tiger habitats with fencing</li><li>Enhance connectivity corridors</li><li>Plant 2,500 ha</li>'; break;
+                    case 'vindhya': recommendations += '<li>Control agriculture expansion</li><li>Launch afforestation programs</li><li>Restore 2,000 ha</li>'; break;
+                    case 'chhota-nagpur': recommendations += '<li>Limit mining with community oversight</li><li>Promote community forestry</li><li>Reforest 3,000 ha</li>'; break;
+                }
+                recommendations += '</ul><p><strong>Impact:</strong> Preserves ecosystems, supports livelihoods, informs policy.</p>';
+                document.getElementById('recommendations').innerHTML = recommendations;
+
+                const totalLoss = aiResult.affectedArea;
+                const peakLoss = Math.max(...aiResult.lossTrend);
+                const peakMonth = aiResult.lossTrend.indexOf(peakLoss) + 1;
+                const avgLoss = (totalLoss / months).toFixed(1);
+                const futureLoss = (avgLoss * 12).toFixed(0); // Next 12 months
+                let insights = `<h3>Insights & Predictions</h3><ul>
+                    <li>Rapid loss of ${totalLoss} ha over ${months} months (avg. ${avgLoss} ha/month).</li>
+                    <li>Peak loss of ${peakLoss} ha in Month ${peakMonth} suggests a major event (e.g., logging/fire).</li>
+                    <li>Prediction: ~${futureLoss} ha more loss in next 12 months if trends continue.</li>
+                    <li>Long-term risk: Total depletion possible by ${new Date().getFullYear() + Math.ceil((totalForestArea[region] - totalLoss) / (avgLoss * 12))} without action.</li>
+                </ul>`;
+                document.getElementById('insights').innerHTML = insights;
+
+                markers[region].setPopupContent(`<b>${region.replace(/-/g, ' ').toUpperCase()}</b><br>Loss: ${aiResult.affectedArea} ha`);
+                map.flyTo(regions[region], 6, { duration: 1.2 });
+                setTimeout(() => markers[region].openPopup(), 1200);
+
+                updateForestImage(region);
+                loadingOverlay.style.display = 'none';
+            }, 1500);
+        }
+
+        function updateTimeLapse(value) {
+            document.getElementById('timeValue').textContent = value;
+            analyzeArea();
+        }
+
+        document.getElementById('region').addEventListener('change', () => {
+            const region = document.getElementById('region').value;
+            markers[region].openPopup();
+            setTimeout(() => markers[region].closePopup(), 1500);
+            updateForestImage(region);
+        });
+
+        window.addEventListener('resize', () => {
+            forestLossChart.resize();
+            biodiversityRiskChart.resize();
+        });
+    </script>
+</body>
+</html>
